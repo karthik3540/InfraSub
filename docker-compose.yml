@@ -1,0 +1,25 @@
+services:
+
+  postgres:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+
+    container_name: infrasub-postgres
+
+    environment:
+      POSTGRES_DB: infrasub
+      POSTGRES_USER: infrasub
+      POSTGRES_PASSWORD: infrasub_dev_password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
