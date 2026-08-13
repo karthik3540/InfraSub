@@ -9,5 +9,4 @@ public class InfrasubBackendApplication {
     public static void main(String[] args) {
         SpringApplication.run(InfrasubBackendApplication.class, args);
     }
-
 }
