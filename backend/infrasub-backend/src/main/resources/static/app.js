@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // API Host configuration: fallback to http://localhost:8080 if loaded as local file
+    const API_BASE = (window.location.origin && window.location.origin.startsWith('http')) 
+        ? window.location.origin 
+        : 'http://localhost:8080';
+
     // Initial map setup
     const defaultLat = 13.0827;
     const defaultLng = 80.2757;
@@ -38,24 +43,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let loadedAssets = [];
 
-    // 1. Fetch available preset assets
-    fetch('/api/infrastructure')
-        .then(res => res.json())
+    // Trigger initial default analysis immediately on page load
+    runAnalysis(defaultLat, defaultLng, 1000, 'Chennai Central Metro Station', 'METRO_STATION', 1);
+
+    // Fetch available preset assets from backend API
+    fetch(`${API_BASE}/api/infrastructure`)
+        .then(res => {
+            if (!res.ok) throw new Error('API response not OK');
+            return res.json();
+        })
         .then(assets => {
             loadedAssets = assets;
+            assetSelect.innerHTML = '<option value="">-- Choose Preset Infrastructure --</option>';
             assets.forEach(asset => {
                 const opt = document.createElement('option');
                 opt.value = asset.id;
                 opt.textContent = `${asset.name} (${asset.type})`;
                 assetSelect.appendChild(opt);
             });
-            // Automatically select first asset
             if (assets.length > 0) {
                 assetSelect.value = assets[0].id;
-                onAssetSelected(assets[0].id);
             }
         })
-        .catch(err => console.error('Error loading preset infrastructure assets:', err));
+        .catch(err => console.error('Error loading preset infrastructure assets from API:', err));
 
     // Handle Asset dropdown selection
     assetSelect.addEventListener('change', (e) => {
@@ -107,15 +117,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }).addTo(map);
 
         // Fetch spatial InSAR scatter points
-        fetch(`/api/insar/nearby?latitude=${lat}&longitude=${lng}&radius=${radius}`)
+        fetch(`${API_BASE}/api/insar/nearby?latitude=${lat}&longitude=${lng}&radius=${radius}`)
             .then(res => res.json())
             .then(points => renderInsarPoints(points))
             .catch(err => console.error('Error fetching nearby InSAR measurements:', err));
 
         // Fetch Risk & RAG explanation
         const riskUrl = assetId
-            ? `/api/infrastructure/${assetId}/risk?radius=${radius}`
-            : `/api/assessment/evaluate?latitude=${lat}&longitude=${lng}&radius=${radius}&name=${encodeURIComponent(name)}&type=${type}`;
+            ? `${API_BASE}/api/infrastructure/${assetId}/risk?radius=${radius}`
+            : `${API_BASE}/api/assessment/evaluate?latitude=${lat}&longitude=${lng}&radius=${radius}&name=${encodeURIComponent(name)}&type=${type}`;
 
         fetch(riskUrl)
             .then(res => res.json())
@@ -125,6 +135,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderInsarPoints(points) {
         insarLayerGroup.clearLayers();
+
+        if (!Array.isArray(points)) return;
 
         points.forEach(pt => {
             const vlm = pt.vlmMmPerYear;
@@ -152,6 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderRiskData(data) {
+        if (!data || !data.analysis || !data.risk) return;
+
         const analysis = data.analysis;
         const risk = data.risk;
 
