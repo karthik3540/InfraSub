@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InfraSub – InSAR Infrastructure Risk & Deformation Monitoring</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+        <div class="header-brand">
+            <div class="brand-logo">
+                <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <div class="brand-titles">
+                <h1>InfraSub <span class="badge-vlm">InSAR VLM Radar</span></h1>
+                <p>Infrastructure Deformation Monitoring & RAG-Assisted Risk Engine</p>
+            </div>
+        </div>
+        <div class="header-stats">
+            <div class="stat-badge">
+                <i class="fa-solid fa-database"></i>
+                <span>Dataset: <strong>94,376 Chennai Points</strong></span>
+            </div>
+            <div class="stat-badge live">
+                <i class="fa-solid fa-circle-dot"></i>
+                <span>PostGIS Spatial Engine: <strong>Active</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Application Container -->
+    <main class="app-container">
+        <!-- Sidebar Controls & Input Form -->
+        <aside class="sidebar">
+            <section class="card control-card">
+                <h2><i class="fa-solid fa-building-user"></i> Asset & Location Selector</h2>
+                <div class="form-group">
+                    <label for="asset-select">Select Landmark Asset:</label>
+                    <select id="asset-select" class="form-control">
+                        <option value="">-- Choose Preset Infrastructure --</option>
+                    </select>
+                </div>
+                
+                <div class="divider"><span>OR CUSTOM COORDINATES</span></div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="input-lat">Latitude (°N):</label>
+                        <input type="number" step="0.0001" id="input-lat" class="form-control" value="13.0827">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-lng">Longitude (°E):</label>
+                        <input type="number" step="0.0001" id="input-lng" class="form-control" value="80.2757">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="input-radius">Radius (meters):</label>
+                        <input type="number" step="100" id="input-radius" class="form-control" value="1000">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-type">Asset Category:</label>
+                        <select id="input-type" class="form-control">
+                            <option value="METRO_STATION">Metro Station</option>
+                            <option value="BRIDGE">Bridge / Flyover</option>
+                            <option value="BUILDING">Building Complex</option>
+                            <option value="HOSPITAL">Hospital</option>
+                            <option value="ROAD">Road / Highway</option>
+                            <option value="OTHER">Other Location</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button id="btn-analyze" class="btn btn-primary">
+                    <i class="fa-solid fa-crosshairs"></i> Analyze Ground Movement & Risk
+                </button>
+            </section>
+
+            <!-- Quick Summary Panel -->
+            <section class="card summary-card" id="summary-panel">
+                <h2><i class="fa-solid fa-chart-line"></i> InSAR Deformation Summary</h2>
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <span class="metric-label">Points Evaluated</span>
+                        <span class="metric-value" id="metric-count">--</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-label">Avg VLM (mm/yr)</span>
+                        <span class="metric-value" id="metric-avg">--</span>
+                    </div>
+                    <div class="metric-box warning">
+                        <span class="metric-label">Peak Subsidence</span>
+                        <span class="metric-value" id="metric-min">--</span>
+                    </div>
+                    <div class="metric-box danger">
+                        <span class="metric-label">% Subsiding</span>
+                        <span class="metric-value" id="metric-neg">--</span>
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+        <!-- Main Content Area: Map & Risk AI Dashboard -->
+        <section class="content-area">
+            <!-- Map Visualization Card -->
+            <div class="card map-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-map-location-dot"></i> Chennai InSAR Spatial Radar Map</h3>
+                    <div class="legend-bar">
+                        <span class="legend-item"><i class="dot severe"></i> &lt; -5 mm/yr (Severe)</span>
+                        <span class="legend-item"><i class="dot moderate"></i> -2 to -5 mm/yr</span>
+                        <span class="legend-item"><i class="dot mild"></i> 0 to -2 mm/yr</span>
+                        <span class="legend-item"><i class="dot stable"></i> &gt; 0 mm/yr (Stable)</span>
+                    </div>
+                </div>
+                <div id="map" class="map-container"></div>
+            </div>
+
+            <!-- Risk Score & Factors Dashboard -->
+            <div class="dashboard-grid">
+                <!-- Risk Gauge & Level Card -->
+                <div class="card risk-card" id="risk-score-card">
+                    <h3><i class="fa-solid fa-shield-halved"></i> Asset Risk Classification</h3>
+                    <div class="risk-gauge-wrapper">
+                        <div class="risk-score-ring" id="risk-score-ring">
+                            <span class="score-number" id="risk-score-num">--</span>
+                            <span class="score-max">/ 100</span>
+                        </div>
+                        <div class="risk-level-badge" id="risk-level-badge">
+                            CALCULATING...
+                        </div>
+                    </div>
+                    <p class="risk-summary-text" id="risk-summary">Click 'Analyze' to compute PostGIS InSAR spatial risk.</p>
+                </div>
+
+                <!-- Contributing Risk Factors Card -->
+                <div class="card factors-card">
+                    <h3><i class="fa-solid fa-list-check"></i> Contributing Risk Drivers</h3>
+                    <div class="factors-list" id="factors-list">
+                        <div class="placeholder-text">No active evaluation loaded.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RAG & LLM Evidence-Based Explanation Card -->
+            <div class="card rag-explanation-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-brain"></i> AI & RAG Scientific Evidence-Based Explanation</h3>
+                    <span class="badge-rag"><i class="fa-solid fa-book-bookmark"></i> PostGIS + RAG + LLM</span>
+                </div>
+                <div class="explanation-body" id="rag-explanation-body">
+                    <div class="placeholder-text">
+                        Select an infrastructure asset or custom coordinate to generate a scientific evidence-based explanation citing peer-reviewed literature and geotechnical standards.
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <!-- Marked Markdown Parser for AI explanations -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Custom Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
